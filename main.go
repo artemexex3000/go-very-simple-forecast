@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
+	_ "github.com/lib/pq"
 	"html/template"
 	"log"
-	src "main/src"
+	"main/database/postgres"
+	"main/src"
 	"net/http"
-	"os"
 )
 
 type forecast struct {
@@ -17,13 +18,22 @@ type forecast struct {
 func main() {
 	var currentCountry string = "Sumy"
 
-	/*fmt.Print("Enter the city/country: ")
-
-	_, err := fmt.Scan(&currentCountry)
+	db, err := postgres.DBConnect(postgres.Config{
+		Host:     "localhost",
+		Port:     "5432",
+		Username: "artemexex3000",
+		Password: "159753159753",
+		DBName:   "postgres",
+		SSL:      "disable",
+	})
 	if err != nil {
-		fmt.Print(err.Error())
-		os.Exit(1)
-	}*/
+		log.Fatalf("Failed to initialize DB: %s", err.Error())
+	}
+
+	err = db.Ping()
+	if err != nil {
+		log.Fatalf("Failed to ping DB: %s", err.Error())
+	}
 
 	fmt.Println("Loading the Kastil' to show info in the browser")
 
@@ -34,11 +44,6 @@ func main() {
 	indexHandler := func(w http.ResponseWriter, r *http.Request) {
 		t, _ := template.ParseFiles(`index.html`)
 
-		/*if r.Method != "Post" {
-			http.Redirect(w, r, "/", http.StatusSeeOther)
-			return
-		}*/
-
 		currentCountry = r.FormValue("city")
 
 		nameVar, forecastVar := src.Forecast(currentCountry)
@@ -48,10 +53,11 @@ func main() {
 			Forecast: &forecastVar,
 		}
 
+		db.MustExec("INSERT INTO requests (request) VALUES ($1)", &nameVar)
+
 		err := t.Execute(w, p)
 		if err != nil {
-			fmt.Print(err.Error())
-			os.Exit(1)
+
 		}
 	}
 
